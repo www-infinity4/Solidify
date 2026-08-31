@@ -1,0 +1,311 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Solidify</title><meta name="description" content="Project blueprint: A versioned project database for promoting experiments into reviewed releases.">
+<link rel="canonical" href="https://www-infinity4.github.io/INFINITY/projects/solidify/">
+<meta property="og:type" content="website"><meta property="og:title" content="Solidify"><meta property="og:description" content="Project blueprint: A versioned project database for promoting experiments into reviewed releases."><meta property="og:url" content="https://www-infinity4.github.io/INFINITY/projects/solidify/"><meta property="og:image" content="https://www-infinity4.github.io/INFINITY/projects/solidify/assets/share-preview-v1.png"><meta property="og:image:secure_url" content="https://www-infinity4.github.io/INFINITY/projects/solidify/assets/share-preview-v1.png"><meta property="og:image:type" content="image/png"><meta property="og:image:width" content="1731"><meta property="og:image:height" content="909"><meta property="og:image:alt" content="Solidify website preview">
+<meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Solidify"><meta name="twitter:description" content="Project blueprint: A versioned project database for promoting experiments into reviewed releases."><meta name="twitter:image" content="https://www-infinity4.github.io/INFINITY/projects/solidify/assets/share-preview-v1.png"><meta name="twitter:image:alt" content="Solidify website preview"><style>*{box-sizing:border-box}body{margin:0;background:#080f1c;color:#f7f1df;font:17px/1.6 system-ui,sans-serif}main{max-width:1040px;margin:auto;padding:32px 24px 80px}h1{font-size:clamp(36px,7vw,68px);line-height:1.08;letter-spacing:-.04em}h2{margin-top:2em}a{color:#aee8ff}img.hero{display:block;width:100%;height:auto;border-radius:16px;margin:24px 0}p{max-width:75ch}.eyebrow{font-size:12px;letter-spacing:.15em;text-transform:uppercase;color:#ffd68a}.button{display:inline-block;border:1px solid #7c99ad;border-radius:8px;padding:12px 20px;text-decoration:none;background:#162a3c;color:#fff;margin:5px 8px 5px 0}.note{border-left:3px solid #ffd68a;background:#142031;padding:16px 20px}.doc{border-top:1px solid #324055;margin-top:48px;overflow-wrap:anywhere}.doc pre{overflow:auto;background:#121d2b;padding:18px;border-radius:8px}.doc table{display:block;overflow:auto;border-collapse:collapse}.doc td,.doc th{border:1px solid #44556b;padding:8px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:18px}.card{padding:22px;border:1px solid #324055;border-radius:14px;background:#101d2c}.card h2{margin:0}</style></head><body><main><a href="https://www-infinity4.github.io/INFINITY/projects/">← Infinity project launchpad</a><p class="eyebrow">Project blueprint</p><h1>Solidify</h1><p>Project blueprint: A versioned project database for promoting experiments into reviewed releases.</p><p class="note"><strong>This is the project design, not an implemented application.</strong> The original specification is preserved below. Features described in it are planned; no AI generation, browser engine, or publishing service runs on this page.</p><a class="button" href="#blueprint">Read the blueprint ↓</a><a class="button" href="https://github.com/www-infinity4/Solidify">View source on GitHub ↗</a><img class="hero" src="assets/share-preview-v1.png" alt="Solidify — Project blueprint"><article class="doc" id="blueprint" aria-label="Original project specification"><h1>Solidify</h1>
+<p><strong>The versioned project database and promotion interface for turning live experiments into tested, explainable releases.</strong></p>
+<p>Solidify receives selected work from Infinity HI-FI, Wave-style collaboration canvases, Omni Gemini agents, StarQuest production tools, and other Infinity projects. It records exactly what was selected, freezes every dependency, coordinates validation, collects approval, and publishes an immutable release manifest.</p>
+<p>Solidify does not generate the creative work itself. It is the trusted boundary between <strong>something that worked once</strong> and <strong>a project that can be rebuilt, reviewed, deployed, and rolled back</strong>.</p>
+<h2>Promotion model</h2>
+<pre><code class="language-text">Experiment
+   ↓ select
+Candidate
+   ↓ build
+Verified ──→ Rejected
+   ↓ approve      ↑ deterministic failure
+Approved ──→ Blocked
+   ↓ publish      ↑ missing authority or dependency
+Released
+   ↓ deploy
+Active deployment
+</code></pre>
+<h2>Responsibilities</h2>
+<ul>
+<li>Stable project, Candidate, build, validation, approval, release, and deployment IDs</li>
+<li>Content-addressed dependencies and assets</li>
+<li>Idempotent build and promotion requests</li>
+<li>Expiring worker leases</li>
+<li>Deterministic validation reports</li>
+<li>Human approval receipts</li>
+<li>Immutable release manifests</li>
+<li>Environment-specific deployments</li>
+<li>Rollback without deleting history</li>
+<li>Provenance across human, agent, code, media, and model inputs</li>
+<li>Rights, visibility, security, and policy gates</li>
+</ul>
+<h2>Non-responsibilities</h2>
+<p>Solidify does not:</p>
+<ul>
+<li>replace Git source control;</li>
+<li>store large audio or video blobs directly in ordinary database rows;</li>
+<li>silently publish a Candidate;</li>
+<li>give agents broader authority than the initiating user;</li>
+<li>remove failed builds or rejected decisions from history;</li>
+<li>treat infrastructure failure as proof that creative work is bad;</li>
+<li>overwrite an active release before validation and approval complete.</li>
+</ul>
+<h2>Core records</h2>
+<pre><code class="language-text">Project
+Candidate
+CandidateInput
+Dependency
+AssetReference
+Build
+BuildStep
+WorkerLease
+ValidationRun
+ValidationCheck
+ValidationReport
+ApprovalRequest
+ApprovalReceipt
+Release
+ReleaseManifest
+Deployment
+Environment
+Rollback
+AuditEvent
+</code></pre>
+<h2>Database schema</h2>
+<p>The prototype can use SQLite. Production may use PostgreSQL, D1, or another transactional database that preserves the same constraints.</p>
+<pre><code class="language-sql">CREATE TABLE projects (
+  project_id TEXT PRIMARY KEY,
+  slug TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL,
+  description TEXT,
+  owner_id TEXT NOT NULL,
+  visibility TEXT NOT NULL CHECK (visibility IN ('private','shared','public')),
+  active_release_id TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE candidates (
+  candidate_id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL REFERENCES projects(project_id),
+  idempotency_key TEXT NOT NULL,
+  source_commit TEXT,
+  source_snapshot_hash TEXT NOT NULL,
+  target_environment TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN (
+    'queued','claimed','running','retry_wait','blocked',
+    'rejected','verified','approved','released','failed','cancelled'
+  )),
+  created_by TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  UNIQUE(project_id, idempotency_key)
+);
+
+CREATE TABLE candidate_inputs (
+  input_id TEXT PRIMARY KEY,
+  candidate_id TEXT NOT NULL REFERENCES candidates(candidate_id),
+  input_type TEXT NOT NULL,
+  source_uri TEXT NOT NULL,
+  content_hash TEXT NOT NULL,
+  version TEXT,
+  rights_state TEXT,
+  metadata_json TEXT NOT NULL DEFAULT '{}'
+);
+
+CREATE TABLE builds (
+  build_id TEXT PRIMARY KEY,
+  candidate_id TEXT NOT NULL REFERENCES candidates(candidate_id),
+  attempt INTEGER NOT NULL,
+  status TEXT NOT NULL,
+  started_at TEXT,
+  completed_at TEXT,
+  output_manifest_hash TEXT,
+  error_class TEXT,
+  error_message TEXT,
+  UNIQUE(candidate_id, attempt)
+);
+
+CREATE TABLE worker_leases (
+  lease_id TEXT PRIMARY KEY,
+  build_id TEXT NOT NULL REFERENCES builds(build_id),
+  worker_id TEXT NOT NULL,
+  lease_token_hash TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  renewed_at TEXT,
+  released_at TEXT
+);
+
+CREATE TABLE validation_checks (
+  check_id TEXT PRIMARY KEY,
+  candidate_id TEXT NOT NULL REFERENCES candidates(candidate_id),
+  build_id TEXT REFERENCES builds(build_id),
+  check_name TEXT NOT NULL,
+  check_version TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('pending','running','passed','failed','blocked','skipped')),
+  severity TEXT NOT NULL CHECK (severity IN ('info','warning','required','critical')),
+  report_uri TEXT,
+  report_hash TEXT,
+  started_at TEXT,
+  completed_at TEXT
+);
+
+CREATE TABLE approval_receipts (
+  approval_id TEXT PRIMARY KEY,
+  candidate_id TEXT NOT NULL REFERENCES candidates(candidate_id),
+  approver_id TEXT NOT NULL,
+  decision TEXT NOT NULL CHECK (decision IN ('approved','rejected','changes_requested')),
+  candidate_manifest_hash TEXT NOT NULL,
+  comment TEXT,
+  decided_at TEXT NOT NULL
+);
+
+CREATE TABLE releases (
+  release_id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL REFERENCES projects(project_id),
+  candidate_id TEXT NOT NULL UNIQUE REFERENCES candidates(candidate_id),
+  version TEXT NOT NULL,
+  manifest_uri TEXT NOT NULL,
+  manifest_hash TEXT NOT NULL UNIQUE,
+  created_by TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  UNIQUE(project_id, version)
+);
+
+CREATE TABLE deployments (
+  deployment_id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL REFERENCES projects(project_id),
+  release_id TEXT NOT NULL REFERENCES releases(release_id),
+  environment TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('queued','deploying','active','failed','rolled_back','superseded')),
+  previous_deployment_id TEXT,
+  deployed_by TEXT NOT NULL,
+  started_at TEXT NOT NULL,
+  completed_at TEXT
+);
+
+CREATE TABLE audit_events (
+  event_id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL REFERENCES projects(project_id),
+  candidate_id TEXT,
+  release_id TEXT,
+  deployment_id TEXT,
+  actor_type TEXT NOT NULL,
+  actor_id TEXT NOT NULL,
+  action TEXT NOT NULL,
+  event_hash TEXT NOT NULL,
+  previous_event_hash TEXT,
+  details_json TEXT NOT NULL DEFAULT '{}',
+  created_at TEXT NOT NULL
+);
+</code></pre>
+<h2>State rules</h2>
+<ul>
+<li>A Candidate cannot become <code>verified</code> until every required check passes.</li>
+<li>A Candidate cannot become <code>approved</code> without a receipt bound to its exact manifest hash.</li>
+<li>Changing an input after approval creates a new Candidate.</li>
+<li>A release is immutable after creation.</li>
+<li>A deployment points to one release and one environment.</li>
+<li>Rollback creates a new deployment event pointing to a prior valid release.</li>
+<li><code>rejected</code> means a deterministic requirement failed.</li>
+<li><code>blocked</code> means required authority, information, infrastructure, or human action is unavailable.</li>
+<li>Expired leases may be reclaimed; completed build steps remain idempotent.</li>
+</ul>
+<h2>Candidate API</h2>
+<pre><code class="language-http">POST   /v1/projects
+GET    /v1/projects/{projectId}
+POST   /v1/projects/{projectId}/candidates
+GET    /v1/candidates/{candidateId}
+POST   /v1/candidates/{candidateId}/claim
+POST   /v1/candidates/{candidateId}/lease/renew
+POST   /v1/candidates/{candidateId}/builds
+POST   /v1/candidates/{candidateId}/checks
+POST   /v1/candidates/{candidateId}/approvals
+POST   /v1/candidates/{candidateId}/releases
+POST   /v1/releases/{releaseId}/deployments
+POST   /v1/deployments/{deploymentId}/rollback
+</code></pre>
+<p>Mutation requests carry an idempotency key. Promotion requests also carry the expected Candidate manifest hash so a stale approval cannot publish changed inputs.</p>
+<h2>Infinity HI-FI integration</h2>
+<p>Infinity HI-FI owns live playback sessions, media clocks, reactive audio graphs, working Wave blips, and temporary render jobs. It submits to Solidify:</p>
+<ul>
+<li>selected blip IDs;</li>
+<li>media and source content hashes;</li>
+<li>audio parameters and mix-graph version;</li>
+<li>code commit and runtime contract;</li>
+<li>Omni Gemini agent/model versions;</li>
+<li>rights and visibility state;</li>
+<li>required validation checks;</li>
+<li>target StarQuest preview environment.</li>
+</ul>
+<p>Solidify returns Candidate state, validation reports, approval requests, release manifests, deployment state, and rollback history.</p>
+<h2>Storage boundaries</h2>
+<table>
+<thead>
+<tr>
+<th>Data</th>
+<th>Storage</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Project and promotion state</td>
+<td>Solidify transactional database</td>
+</tr>
+<tr>
+<td>Large audio/video/images</td>
+<td>Object storage referenced by URI and hash</td>
+</tr>
+<tr>
+<td>Source code</td>
+<td>Git repository and immutable commit</td>
+</tr>
+<tr>
+<td>Collaborative working state</td>
+<td>Wave/Yjs service</td>
+</tr>
+<tr>
+<td>Logs and traces</td>
+<td>Observability store linked by IDs</td>
+</tr>
+<tr>
+<td>Release manifest</td>
+<td>Immutable object plus indexed database record</td>
+</tr>
+</tbody>
+</table>
+<h2>Security</h2>
+<ul>
+<li>Every mutation requires authenticated project authority.</li>
+<li>Worker leases use hashed, expiring tokens.</li>
+<li>Agents may submit results but cannot approve their own release unless explicitly authorized by policy.</li>
+<li>Approval binds to a manifest hash, not merely a Candidate name.</li>
+<li>Object references are validated for permitted scheme, ownership, and content hash.</li>
+<li>Database credentials never enter a blip, prompt, build log, or release manifest.</li>
+<li>Audit events are append-only and hash-linked.</li>
+<li>Publishing and rollback remain explicit authorized actions.</li>
+</ul>
+<h2>Prototype plan</h2>
+<ol>
+<li>Create the SQLite schema and migrations.</li>
+<li>Implement Project and Candidate creation.</li>
+<li>Add idempotency and Candidate input hashing.</li>
+<li>Implement build claims and expiring leases.</li>
+<li>Store validation checks and reports.</li>
+<li>Bind approval receipts to Candidate manifest hashes.</li>
+<li>Generate immutable release manifests.</li>
+<li>Add private preview deployment and rollback.</li>
+<li>Connect one Infinity HI-FI Candidate end to end.</li>
+<li>Test duplicate messages, expired workers, blocked dependencies, failed checks, stale approvals, and rollback.</li>
+</ol>
+<h2>Acceptance criteria</h2>
+<ul>
+<li>Repeating the same Candidate request does not create duplicates.</li>
+<li>A crashed worker's lease expires and work can resume safely.</li>
+<li>Failed required checks prevent promotion.</li>
+<li>Blocked dependencies remain distinguishable from rejected work.</li>
+<li>Approval for one manifest cannot approve a changed manifest.</li>
+<li>Released manifests cannot be edited.</li>
+<li>Rollback does not erase the failed or superseded deployment.</li>
+<li>Infinity HI-FI can submit a mix Candidate and receive a private StarQuest preview release.</li>
+</ul>
+<h2>Status</h2>
+<p><strong>Database and API architecture specification.</strong> The first implementation should remain small, transactional, auditable, and provider-independent.</p>
+<h2>Working principle</h2>
+<blockquote>
+<p>Experiments may be fluid. Releases must be exact.</p>
+</blockquote></article></main><script defer src="https://www-infinity4.github.io/Mint-For-Infinity/unified-wallet.js?v=20260831-game-rewards1"></script>
+<script defer src="https://www-infinity4.github.io/Mint-For-Infinity/site-community.js?v=20260831-storage2" data-site-id="SOLIDIFY" data-site-title="Solidify" data-share-url="https://www-infinity4.github.io/INFINITY/projects/solidify/share.html"></script></body></html>
